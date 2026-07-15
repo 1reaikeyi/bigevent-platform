@@ -55,7 +55,7 @@ public class VoucherController {
     }
 
     @PostMapping("/pay")
-    public Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
+    public synchronized Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
         VoucherSeckill voucherSeckill = voucherSeckillService.getById(voucherOrder.getVoucherId());
         if(voucherSeckill == null){
             return Result.error("不存在");
