@@ -1,0 +1,97 @@
+-- 创建数据库
+create database if not exists use_big_event;
+-- 用户表
+-- auto-generated definition
+create table user
+(
+    id          bigint auto_increment comment 'ID'
+        primary key,
+    username    varchar(20)             not null comment '用户名',
+    password    varchar(32)             null comment '密码',
+    nickname    varchar(10)  default '' null comment '昵称',
+    email       varchar(128) default '' null comment '邮箱',
+    user_pic    varchar(128) default '' null comment '头像',
+    create_time datetime                not null comment '创建时间',
+    update_time datetime                not null comment '修改时间',
+    constraint username
+        unique (username)
+)
+    comment '用户表';
+
+-- 分类表
+-- auto-generated definition
+create table category
+(
+    id             bigint auto_increment comment 'ID'
+        primary key,
+    category_name  varchar(32) not null comment '分类名称',
+    category_alias varchar(32) not null comment '分类别名',
+    create_user    bigint      not null comment '创建人ID,关联user.id',
+    update_user    bigint      null comment '更新人',
+    create_time    datetime    not null comment '创建时间',
+    update_time    datetime    not null comment '修改时间'
+);
+
+-- 文章表
+-- auto-generated definition
+create table article
+(
+    id          bigint auto_increment comment 'ID'
+        primary key,
+    title       varchar(50)               not null comment '文章标题',
+    content     varchar(10000)            not null comment '文章内容',
+    cover_img   varchar(128)              not null comment '文章封面',
+    state       varchar(3) default '草稿' null comment '文章状态: 只能是[已发布] 或者 [草稿]',
+    category_id bigint                    null comment '文章分类ID,关联category.id',
+    create_user bigint                    not null comment '创建人ID,关联user.id',
+    update_user bigint                    null comment '更新人',
+    create_time datetime                  not null comment '创建时间',
+    update_time datetime                  not null comment '修改时间'
+);
+-- ----------------------------
+-- Table structure for voucher 优惠券主表
+-- ----------------------------
+CREATE TABLE `voucher`  (
+  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '优惠券主键ID',
+  `shop_id` bigint(20) UNSIGNED NULL DEFAULT NULL COMMENT '所属门店ID',
+  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '优惠券标题',
+  `sub_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '优惠券副标题',
+  `rules` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '优惠券使用规则',
+  `pay_value` bigint(10) UNSIGNED NOT NULL COMMENT '用户购买支付金额，单位分',
+  `actual_value` bigint(10) NOT NULL COMMENT '优惠券抵扣金额，单位分',
+  `type` tinyint(1) UNSIGNED NOT NULL DEFAULT 0 COMMENT '券类型：0普通代金券，1秒杀券',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '优惠券状态：1上架，2下架，3过期',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '优惠券创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '优惠券更新时间',
+  PRIMARY KEY (`id`) USING BTREE
+)COMMENT = '优惠券主表';
+-- ----------------------------
+-- Table structure for seckill_voucher 秒杀优惠券表
+-- ----------------------------
+CREATE TABLE `voucher_seckill`  (
+  `voucher_id` bigint(20) UNSIGNED NOT NULL COMMENT '关联优惠券表主键ID',
+  `stock` int(8) NOT NULL COMMENT '秒杀库存数量',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `begin_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '秒杀活动开始时间',
+  `end_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '秒杀活动结束时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`voucher_id`) USING BTREE
+)COMMENT = '秒杀优惠券表，与优惠券一对一关联';
+-- ----------------------------
+-- Table structure for voucher_order 优惠券订单表
+-- ----------------------------
+CREATE TABLE `voucher_order`  (
+  `id` bigint(20) NOT NULL COMMENT '订单唯一主键ID',
+  `user_id` bigint(20) UNSIGNED NOT NULL COMMENT '下单用户ID',
+  `voucher_id` bigint(20) UNSIGNED NOT NULL COMMENT '购买的优惠券ID',
+  `pay_type` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '支付方式：1余额，2支付宝，3微信',
+  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '订单状态：1未支付，2已支付，3已核销，4已取消，5退款中，6已退款',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下单时间',
+  `pay_time` timestamp NULL DEFAULT NULL COMMENT '支付完成时间',
+  `use_time` timestamp NULL DEFAULT NULL COMMENT '门店核销使用时间',
+  `refund_time` timestamp NULL DEFAULT NULL COMMENT '退款完成时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '订单更新时间',
+  PRIMARY KEY (`id`) USING BTREE
+)COMMENT = '优惠券购买订单表';
+
+
