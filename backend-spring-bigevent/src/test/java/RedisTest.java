@@ -1,7 +1,7 @@
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import service.secord.RedisID;
+import service.id.RedisID;
 import start.BigEventApplication;
 
 

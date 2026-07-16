@@ -1,4 +1,4 @@
-package service.lock;
+package service.cache;
 
 import lombok.Data;
 

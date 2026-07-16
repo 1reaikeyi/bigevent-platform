@@ -2,7 +2,9 @@ package start.controller;
 
 import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import common.constant.JwtConstant;
 import common.result.Result;
+import common.util.ThreadLocalContextHolder;
 import lombok.extern.slf4j.Slf4j;
 import model.dto.VoucherDTO;
 import model.entity.Voucher;
@@ -19,10 +21,11 @@ import service.VoucherOrderService;
 import service.VoucherSeckillService;
 import service.VoucherService;
 import service.lock.RedisLock;
-import service.secord.RedisID;
+import service.id.RedisID;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/voucher")
@@ -68,10 +71,9 @@ public class VoucherController {
         }
         //并发
         voucherOrder.setId(redisID.createId("购买"));
-//        Map<String,Object> claims = ThreadLocalContextHolder.get();
-//        String currentId = claims.get(JwtConstant.ID).toString();
-//        Long userId = Long.parseLong(currentId);
-        Long userId = 1L;
+        Map<String,Object> claims = ThreadLocalContextHolder.get();
+        String currentId = claims.get(JwtConstant.ID).toString();
+        Long userId = Long.parseLong(currentId);
         voucherOrder.setUserId(userId);
         RedisLock redisLock = new RedisLock(stringRedisTemplate,"pay"+userId);
         boolean start = redisLock.getLocked(10);
@@ -91,10 +93,9 @@ public class VoucherController {
     }
     @Transactional(rollbackFor = Exception.class)
     public Result payVoucherSuccess(Long voucherId) {
-//        Map<String,Object> claims = ThreadLocalContextHolder.get();
-//        String currentId = claims.get(JwtConstant.ID).toString();
-//        Long userId = Long.parseLong(currentId);
-        Long userId = 1L;
+        Map<String,Object> claims = ThreadLocalContextHolder.get();
+        String currentId = claims.get(JwtConstant.ID).toString();
+        Long userId = Long.parseLong(currentId);
         Long count = voucherOrderService.count(new LambdaQueryWrapper<VoucherOrder>()
                 .eq(VoucherOrder::getUserId,userId)
                 .eq(VoucherOrder::getVoucherId,voucherId));

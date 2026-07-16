@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import model.entity.Article;
 import mapper.ArticleMapper;
 import service.ArticleService;
-import service.lock.RedisData;
+import service.cache.RedisData;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;

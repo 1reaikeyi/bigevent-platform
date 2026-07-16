@@ -11,7 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import service.CategoryService;
 import org.springframework.stereotype.Service;
-import service.lock.RedisData;
+import service.cache.RedisData;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;

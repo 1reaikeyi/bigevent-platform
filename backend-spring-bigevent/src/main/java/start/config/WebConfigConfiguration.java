@@ -23,12 +23,12 @@ public class WebConfigConfiguration implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 注册登录拦截器，排除注册和登录接口
         registry.addInterceptor(reLoginInterceptor)
-                .addPathPatterns("/user/**")
+                .addPathPatterns("/**")
                 .excludePathPatterns("/user/register", "/user/login", "/user/logout",
                         "/user/code", "/user/byEmail")
                 .order(0);
         registry.addInterceptor(loginInterceptor)
-                .addPathPatterns("/user/**")
+                .addPathPatterns("/**")
                 .excludePathPatterns("/user/register", "/user/login", "/user/logout",
                         "/user/code", "/user/byEmail")
                 .order(1);
