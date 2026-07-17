@@ -1,6 +1,6 @@
-# BigEvent-platform 大事件+评论
+# Weibo-comment-platform 大众点评
 
-一个基于 Spring Boot + Vue 3 的现代化大众评论的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀等核心功能。
+基于 Spring Boot + Vue 3 的大众评论，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀等核心功能。
 
 ## 功能特性
 
@@ -26,7 +26,7 @@
 | Spring Boot Starter Validation | 3.3.8 | @NotNull、@Size等注解校验注册和登录参数的合法性 |
 | Aliyun SDK OSS | 3.17.4 | AliOssUtil实现用户头像上传到阿里云OSS，返回CDN访问URL |
 
-### 文章管理功能依赖
+### 事件文章管理功能依赖
 | 依赖 | 版本 | 功能支撑 |
 | :--- | :--- | :--- |
 | MyBatis Plus | 3.5.9 | ArticleMapper实现文章数据CRUD；AutoMetaObjectHandler自动填充创建人ID和时间 |
@@ -51,12 +51,6 @@
 | Spring Boot Starter Validation | 3.3.8 | 参数校验支持 |
 | Spring Boot Starter Web | 3.3.8 | 提供@Transactional注解实现秒杀订单事务一致性（通过spring-tx传递依赖） |
 | Hutool All | 5.8.36 | BeanUtil进行对象属性拷贝（VoucherDTO转Voucher）；UUID生成分布式锁唯一标识 |
-
-### Redis分布式锁依赖
-| 依赖 | 版本 | 功能支撑 |
-| :--- | :--- | :--- |
-| Spring Boot Starter Data Redis | 3.3.8 | 提供Redis操作能力，实现分布式锁的获取（setIfAbsent）和Lua脚本执行 |
-| Hutool All | 5.8.36 | UUID.randomUUID()生成锁的唯一标识，防止误删其他线程的锁 |
 
 ### 核心组件说明
 
@@ -140,6 +134,13 @@ class RedisData {
 | **分布式锁** | RedisLock.getLocked() | 基于Redis实现分布式锁，保证集群环境下的一人一单限制；key为 `lock:pay{userId}`，使用Lua脚本原子释放 |
 | **一人一单校验** | LambdaQueryWrapper查询 | 在事务中基于用户ID和优惠券ID查询已存在订单 |
 | **原子库存扣减** | lambdaUpdate.gt(stock, 0).setSql("stock = stock - 1") | 使用乐观锁，CAS操作保证库存扣减的原子性，防止超卖 |
+
+### Redis分布式锁依赖
+
+| 依赖                           | 版本   | 功能支撑                                                     |
+| :----------------------------- | :----- | :----------------------------------------------------------- |
+| Spring Boot Starter Data Redis | 3.3.8  | 提供Redis操作能力，实现分布式锁的获取（setIfAbsent）和Lua脚本执行 |
+| Hutool All                     | 5.8.36 | UUID.randomUUID()生成锁的唯一标识，防止误删其他线程的锁      |
 
 ### 秒杀流程说明
 
@@ -257,6 +258,7 @@ big_event/
 
 ## 环境要求
 - JDK 17+
+- springboot 3+
 - Node.js 20.19.0+ 或 22.12.0+
 - MySQL 8.0+
 - Redis 7.0+

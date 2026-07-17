@@ -53,6 +53,10 @@ public class VoucherController {
                         .voucherId(voucherDTO.getId())
                         .build();})
                 .toList();
+        for (int i = 0; i < voucherSeckillList.size(); i++) {
+            stringRedisTemplate.opsForValue().set("voucherSeckill:stock:"+voucher.getId(),
+                    voucherSeckillList.get(i).getStock().toString());
+        }
         voucherSeckillService.saveBatch(voucherSeckillList);
         return Result.success("createVoucher");
     }
