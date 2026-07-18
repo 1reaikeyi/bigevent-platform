@@ -3,7 +3,7 @@ package start.interceptor;
 import common.constant.JwtConstant;
 import common.properties.JwtProperties;
 import common.util.JwtUtil;
-import common.util.ThreadLocalContextHolder;
+import common.ThreadLocalContext.ThreadLocalContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;

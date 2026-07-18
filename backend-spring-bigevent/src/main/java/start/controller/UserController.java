@@ -4,7 +4,7 @@ import common.constant.JwtConstant;
 import common.properties.JwtProperties;
 import common.result.Result;
 import common.util.JwtUtil;
-import common.util.ThreadLocalContextHolder;
+import common.ThreadLocalContext.ThreadLocalContextHolder;
 import model.entity.User;
 import org.springframework.transaction.annotation.Transactional;
 import service.UserService;

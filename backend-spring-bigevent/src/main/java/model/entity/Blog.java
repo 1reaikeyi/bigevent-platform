@@ -6,6 +6,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 发布笔记表
+ */
 @Data
 @TableName("blog")
 public class Blog {
@@ -74,6 +77,6 @@ public class Blog {
      * 笔记更新时间
      */
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @TableField(value = "create_time", fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updateTime;
 }

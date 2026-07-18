@@ -1,6 +1,6 @@
 package start.interceptor;
 
-import common.util.ThreadLocalContextHolder;
+import common.ThreadLocalContext.ThreadLocalContextHolder;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.stereotype.Component;

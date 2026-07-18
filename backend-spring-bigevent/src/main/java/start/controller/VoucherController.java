@@ -4,7 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import common.constant.JwtConstant;
 import common.result.Result;
-import common.util.ThreadLocalContextHolder;
+import common.ThreadLocalContext.ThreadLocalContextHolder;
 import lombok.extern.slf4j.Slf4j;
 import model.dto.VoucherDTO;
 import model.entity.Voucher;

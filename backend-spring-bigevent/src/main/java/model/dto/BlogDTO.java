@@ -13,16 +13,14 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class BlogDTO {
-
+    /**
+     * 主键ID
+     */
+    private Long id;
     /**
      * 商户ID
      */
     private Long shopId;
-
-    /**
-     * 发布用户ID
-     */
-    private Long userId;
 
     /**
      * 探店笔记标题

@@ -1,4 +1,4 @@
-package common.util;
+package common.ThreadLocalContext;
 
 /**
  * ThreadLocal工具类 - 提供ThreadLocal的封装操作

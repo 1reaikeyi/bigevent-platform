@@ -6,6 +6,9 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+/**
+ * 评论区表
+ */
 @Data
 @TableName("blog_comments")
 public class BlogComments {
@@ -69,7 +72,7 @@ public class BlogComments {
     /**
      * 评论更新时间
      */
-    @TableField(value = "create_time", fill = FieldFill.INSERT_UPDATE)
+    @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updateTime;
 }
