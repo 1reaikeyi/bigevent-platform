@@ -46,7 +46,7 @@ public class RedisLock implements ILock{
      * 释放锁
      */
     @Override
-    public void unlook() {
+    public void unlock() {
         String key = KEY_PREFIX + name;
         Long id = Thread.currentThread().getId();
         String value = VALUE_PREFIX+id;

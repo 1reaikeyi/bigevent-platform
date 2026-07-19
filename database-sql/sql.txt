@@ -2,6 +2,7 @@
 create database if not exists use_big_event;
 -- 用户表
 -- auto-generated definition
+drop table if exists user;
 create table user
 (
     id          bigint auto_increment comment 'ID'
@@ -20,6 +21,7 @@ create table user
 
 -- 分类表
 -- auto-generated definition
+drop table if exists category;
 create table category
 (
     id             bigint auto_increment comment 'ID'
@@ -34,6 +36,7 @@ create table category
 
 -- 文章表
 -- auto-generated definition
+drop table if exists article;
 create table article
 (
     id          bigint auto_increment comment 'ID'
@@ -51,47 +54,136 @@ create table article
 -- ----------------------------
 -- Table structure for voucher 优惠券主表
 -- ----------------------------
-CREATE TABLE `voucher`  (
-  `id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '优惠券主键ID',
-  `shop_id` bigint(20) UNSIGNED NULL DEFAULT NULL COMMENT '所属门店ID',
-  `title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL COMMENT '优惠券标题',
-  `sub_title` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '优惠券副标题',
-  `rules` varchar(1024) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT NULL COMMENT '优惠券使用规则',
-  `pay_value` bigint(10) UNSIGNED NOT NULL COMMENT '用户购买支付金额，单位分',
-  `actual_value` bigint(10) NOT NULL COMMENT '优惠券抵扣金额，单位分',
-  `type` tinyint(1) UNSIGNED NOT NULL DEFAULT 0 COMMENT '券类型：0普通代金券，1秒杀券',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '优惠券状态：1上架，2下架，3过期',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '优惠券创建时间',
-  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '优惠券更新时间',
-  PRIMARY KEY (`id`) USING BTREE
-)COMMENT = '优惠券主表';
+-- auto-generated definition
+drop table if exists voucher;
+create table voucher
+(
+    id           bigint auto_increment comment '优惠券主键ID'
+        primary key,
+    shop_id      bigint unsigned                          null comment '所属门店ID',
+    title        varchar(255) collate utf8mb4_general_ci  not null comment '优惠券标题',
+    sub_title    varchar(255) collate utf8mb4_general_ci  null comment '优惠券副标题',
+    type         bigint    default 0                      not null comment '券类型：0普通代金券，1秒杀券',
+    status       bigint    default 1                      not null comment '优惠券状态：1上架，2下架，3过期',
+    rules        varchar(1024) collate utf8mb4_general_ci null comment '优惠券使用规则',
+    pay_value    bigint unsigned                          not null comment '用户购买支付金额，单位分',
+    actual_value bigint                                   not null comment '优惠券抵扣金额，单位分',
+    create_time  timestamp default CURRENT_TIMESTAMP      not null comment '优惠券创建时间',
+    update_time  timestamp default CURRENT_TIMESTAMP      not null on update CURRENT_TIMESTAMP comment '优惠券更新时间'
+)
+    comment '优惠券主表';
 -- ----------------------------
 -- Table structure for seckill_voucher 秒杀优惠券表
 -- ----------------------------
-CREATE TABLE `voucher_seckill`  (
-  `voucher_id` bigint(20) UNSIGNED NOT NULL COMMENT '关联优惠券表主键ID',
-  `stock` int(8) NOT NULL COMMENT '秒杀库存数量',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-  `begin_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '秒杀活动开始时间',
-  `end_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '秒杀活动结束时间',
-  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`voucher_id`) USING BTREE
-)COMMENT = '秒杀优惠券表，与优惠券一对一关联';
+-- auto-generated definition
+drop table if exists voucher_seckill;
+create table voucher_seckill
+(
+    voucher_id  bigint                              not null comment '关联优惠券表主键ID'
+        primary key,
+    stock       bigint                              not null comment '秒杀库存数量',
+    begin_time  timestamp default CURRENT_TIMESTAMP not null comment '秒杀活动开始时间',
+    end_time    timestamp default CURRENT_TIMESTAMP not null comment '秒杀活动结束时间',
+    create_time timestamp default CURRENT_TIMESTAMP not null comment '记录创建时间',
+    update_time timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '更新时间'
+)
+    comment '秒杀优惠券表';
 -- ----------------------------
 -- Table structure for voucher_order 优惠券订单表
 -- ----------------------------
-CREATE TABLE `voucher_order`  (
-  `id` bigint(20) NOT NULL COMMENT '订单唯一主键ID',
-  `user_id` bigint(20) UNSIGNED NOT NULL COMMENT '下单用户ID',
-  `voucher_id` bigint(20) UNSIGNED NOT NULL COMMENT '购买的优惠券ID',
-  `pay_type` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '支付方式：1余额，2支付宝，3微信',
-  `status` tinyint(1) UNSIGNED NOT NULL DEFAULT 1 COMMENT '订单状态：1未支付，2已支付，3已核销，4已取消，5退款中，6已退款',
-  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '下单时间',
-  `pay_time` timestamp NULL DEFAULT NULL COMMENT '支付完成时间',
-  `use_time` timestamp NULL DEFAULT NULL COMMENT '门店核销使用时间',
-  `refund_time` timestamp NULL DEFAULT NULL COMMENT '退款完成时间',
-  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '订单更新时间',
-  PRIMARY KEY (`id`) USING BTREE
-)COMMENT = '优惠券购买订单表';
+-- auto-generated definition
+drop table if exists voucher_order;
+create table voucher_order
+(
+    id          bigint                              not null comment '订单唯一主键ID'
+        primary key,
+    user_id     bigint                              not null comment '下单用户ID',
+    voucher_id  bigint                              not null comment '购买的优惠券ID',
+    pay_type    bigint    default 1                 not null comment '支付方式：1余额，2支付宝，3微信',
+    status      bigint    default 1                 not null comment '订单状态：1未支付，2已支付，3已核销，4已取消，5退款中，6已退款',
+    create_time timestamp default CURRENT_TIMESTAMP not null comment '下单时间',
+    pay_time    timestamp                           null comment '支付完成时间',
+    use_time    timestamp                           null comment '门店核销使用时间',
+    refund_time timestamp                           null comment '退款完成时间',
+    update_time timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '订单更新时间'
+)
+    comment '优惠券购买订单表';
+-- ----------------------------
+-- Table structure for blog 探店笔记表
+-- ----------------------------
+DROP TABLE IF EXISTS `blog`;
+-- auto-generated definition
+create table blog
+(
+    id          bigint auto_increment comment '主键自增ID'
+        primary key,
+    shop_id     bigint                              not null comment '商户ID',
+    user_id     bigint                              not null comment '发布用户ID',
+    title       varchar(255)                        not null comment '探店笔记标题',
+    images      varchar(2048)                       not null comment '探店照片地址，最多9张，多图逗号分隔',
+    content     varchar(2048)                       not null comment '探店文字描述内容',
+    liked       bigint    default 0                 null comment '笔记点赞数量',
+    comments    bigint    default 0                 null comment '笔记评论总数',
+    create_time timestamp default CURRENT_TIMESTAMP not null comment '笔记创建时间',
+    update_time timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '笔记更新时间'
+)
+    comment '探店笔记主表' collate = utf8mb4_unicode_ci;
 
+create index idx_create_time
+    on blog (create_time)
+    comment '按发布时间排序索引';
 
+create index idx_shop_id
+    on blog (shop_id)
+    comment '商户笔记查询索引';
+
+create index idx_user_id
+    on blog (user_id)
+    comment '用户发布笔记索引';
+-- ----------------------------
+-- Table structure for blog_comments 笔记评论表
+-- ----------------------------
+DROP TABLE IF EXISTS `blog_comments`;
+-- auto-generated definition
+create table blog_comments
+(
+    id          bigint auto_increment comment '评论主键自增ID'
+        primary key,
+    user_id     bigint                              not null comment '评论发布用户ID',
+    blog_id     bigint                              not null comment '关联探店笔记ID',
+    parent_id   bigint    default 0                 not null comment '回复blog评论评论值为0，回复blog_comments评论评论值为1',
+    answer_id   bigint                              not null comment '回复目标评论ID',
+    content     varchar(255)                        not null comment '评论文字内容',
+    liked       bigint    default 0                 null comment '评论点赞数量',
+    status      tinyint   default 0                 null comment '评论状态：0正常，1被举报，2禁止查看',
+    create_time timestamp default CURRENT_TIMESTAMP not null comment '评论创建时间',
+    update_time timestamp default CURRENT_TIMESTAMP not null on update CURRENT_TIMESTAMP comment '评论更新时间'
+)
+    comment '探店笔记评论明细表' collate = utf8mb4_unicode_ci;
+
+create index idx_blog_id
+    on blog_comments (blog_id)
+    comment '根据笔记查询所有评论';
+
+create index idx_parent_blog
+    on blog_comments (blog_id, parent_id)
+    comment '笔记下一级评论联合索引';
+
+create index idx_user_id
+    on blog_comments (user_id)
+    comment '用户发布评论查询索引';
+
+-- ----------------------------
+-- Table structure for user_follow
+-- ----------------------------
+DROP TABLE IF EXISTS `user_follow`;
+-- auto-generated definition
+create table user_follow
+(
+    id             bigint auto_increment comment '主键'
+        primary key,
+    user_id        bigint unsigned                     not null comment '用户id',
+    follow_user_id bigint unsigned                     not null comment '关联的用户id',
+    create_time    timestamp default CURRENT_TIMESTAMP not null comment '创建时间'
+)
+    comment '关注表' collate = utf8mb4_unicode_ci;
