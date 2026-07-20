@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import start.annotation.ArticleStatus;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @TableName("article")
 @Builder
-public class Article {
+public class Article implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;//主键ID
     @TableField("title")

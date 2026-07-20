@@ -7,11 +7,12 @@ import lombok.Builder;
 import lombok.Data;
 import model.entity.VoucherSeckill;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
 @Data
 @Builder
-public class VoucherDTO {
+public class VoucherDTO implements Serializable {
     /**
      *主键id
      */

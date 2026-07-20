@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @TableName("category")
 @Builder
-public class Category {
+public class Category implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;//主键ID
     @NotEmpty

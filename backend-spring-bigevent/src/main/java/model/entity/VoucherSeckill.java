@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 /**
@@ -18,7 +19,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @TableName("voucher_seckill")
 @Builder
-public class VoucherSeckill {
+public class VoucherSeckill implements Serializable {
     /**
      * 关联优惠券表主键ID
      */

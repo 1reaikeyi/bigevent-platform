@@ -8,11 +8,12 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class BlogDTO {
+public class BlogDTO implements Serializable {
     /**
      * 主键ID
      */

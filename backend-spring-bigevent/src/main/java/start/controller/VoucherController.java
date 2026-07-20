@@ -10,6 +10,7 @@ import model.dto.VoucherDTO;
 import model.entity.Voucher;
 import model.entity.VoucherOrder;
 import model.entity.VoucherSeckill;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,7 @@ public class VoucherController {
     private RedisID redisID;
     @Autowired
     private StringRedisTemplate stringRedisTemplate;
+
     @PostMapping("/create")
     public Result createVoucher(@RequestBody VoucherDTO voucherDTO) {
         Voucher voucher = BeanUtil.toBean(voucherDTO, Voucher.class);
@@ -64,61 +66,48 @@ public class VoucherController {
     }
 
     @PostMapping("/pay")
-    public synchronized Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
-        VoucherSeckill voucherSeckill = voucherSeckillService.getById(voucherOrder.getVoucherId());
-        if(voucherSeckill == null){
-            return Result.error("不存在");
+    public Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
+        VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
+        if (voucherSeckill == null) {
+            return Result.error("失败");
         }
-        if (LocalDateTime.now().isBefore(voucherSeckill.getBeginTime()) || LocalDateTime.now().isAfter(voucherSeckill.getEndTime())){
-            return Result.error("不在规定时间段");
-        }
-        if(voucherSeckill.getStock() <= 0){
-            return Result.error("结束了");
-        }
-        //并发
-        voucherOrder.setId(redisID.createId("order"));
-        Map<String,Object> claims = ThreadLocalContextHolder.get();
-        String currentId = claims.get(JwtConstant.ID).toString();
-        Long userId = Long.parseLong(currentId);
-        voucherOrder.setUserId(userId);
-        RedisLock redisLock = new RedisLock(stringRedisTemplate,"voucherSeckill:"+userId);
-        boolean start = redisLock.getLocked(10);
-        if (!start){
+        Map<String, Object> claims = ThreadLocalContextHolder.get();
+        Long userId = Long.parseLong(claims.get(JwtConstant.ID).toString());
+        // 获取锁
+        RedisLock redisLock = new RedisLock(stringRedisTemplate, "voucherSeckill:" + userId);
+        boolean locked = redisLock.getLocked(10);
+        if (!locked) {
             throw new RuntimeException("不要重复");
         }
         try {
-            Result result = payVoucherSuccess(voucherOrder.getVoucherId());
-            if (result.getCode() != 200){
-                return Result.error("error");
-            }
-            voucherOrderService.save(voucherOrder);
-        }finally {
+            voucherOrder.setId(redisID.createId("order"));
+            voucherOrder.setUserId(userId);
+            return ((VoucherController) AopContext.currentProxy()).paySuccess(voucherOrder);
+        } finally {
             redisLock.unlock();
         }
-        return Result.success("payVoucherSuccess");
     }
     @Transactional(rollbackFor = Exception.class)
-    public Result payVoucherSuccess(Long voucherId) {
-        Map<String,Object> claims = ThreadLocalContextHolder.get();
-        String currentId = claims.get(JwtConstant.ID).toString();
-        Long userId = Long.parseLong(currentId);
-        //Atomicity
+    public Result paySuccess(VoucherOrder voucherOrder) {
+        // 一人一单检查
+        Long count = voucherOrderService.count(new LambdaQueryWrapper<VoucherOrder>()
+                .eq(VoucherOrder::getUserId, voucherOrder.getUserId())
+                .eq(VoucherOrder::getVoucherId, voucherOrder.getVoucherId()));
+        if (count > 0) {
+            throw new RuntimeException("一人一单");
+        }
+        // 扣库存
         boolean success = voucherSeckillService.lambdaUpdate()
-                .eq(VoucherSeckill::getVoucherId, voucherId)
+                .eq(VoucherSeckill::getVoucherId, voucherOrder.getVoucherId())
                 .gt(VoucherSeckill::getStock, 0)
                 .setSql("stock = stock - 1")
                 .update();
-        // 必须检查库存扣减是否成功，失败则返回错误，不创建订单
         if (!success) {
             throw new RuntimeException("库存不够");
         }
-        Long count = voucherOrderService.count(new LambdaQueryWrapper<VoucherOrder>()
-                .eq(VoucherOrder::getUserId,userId)
-                .eq(VoucherOrder::getVoucherId,voucherId));
-        if (count > 0){
-            throw new RuntimeException("一人一单");
-        }
-        return Result.success(voucherId);
+        // 保存订单
+        voucherOrderService.save(voucherOrder);
+        return Result.success("payVoucherSuccess");
     }
 
 }
