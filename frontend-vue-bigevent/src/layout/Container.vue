@@ -9,7 +9,7 @@ import {
   CaretBottom
 } from '@element-plus/icons-vue'
 import avatar from '@/assets/default.png'
-import { useUserStore } from '@/stores'
+import { useUserStore } from '@/stores/index.js'
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -30,7 +30,7 @@ const handleCommand = async (key) => {
     <el-aside width="200px">
       <div class="el-aside__logo"></div>
       <el-menu active-text-color="#ffd04b" background-color="#232323" :default-active="$route.path" text-color="#fff" router>
-        <el-menu-item index="/article/category"><el-icon><Management /></el-icon><span>目录分类</span></el-menu-item>
+        <el-menu-item index="/article/category"><el-icon><Management /></el-icon><span>目录查看</span></el-menu-item>
         <el-menu-item index="/article/get"><el-icon><Promotion /></el-icon><span>新闻查看</span></el-menu-item>
         <el-menu-item index="/article/edit"><el-icon><Promotion /></el-icon><span>文章编辑</span></el-menu-item>
         <el-sub-menu index="/user">

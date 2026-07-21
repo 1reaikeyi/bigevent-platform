@@ -34,13 +34,13 @@ public class InfoAspect {
             // 2. 执行目标方法
             result = joinPoint.proceed();
             long costTime = System.currentTimeMillis() - startTime;
-            log.info("---执行成功：{}，import：{}，method：{}，详细：{}", describe,className, methodName,methodArgs);
-            log.info("耗时：{}ms，Result：{}", costTime, result);
+            log.info("---执行成功:{}, import:{}, method:{}, 详细:{}", describe,className, methodName,methodArgs);
+            log.info("耗时:{}ms, Result:{}", costTime, result);
         } catch (Exception e) {
             // 3. 方法执行异常处理
             long costTime = System.currentTimeMillis() - startTime;
-            log.error("---执行失败：{}，import：{}，method：{}，详细：{}", describe,className, methodName,methodArgs);
-            log.error("耗时：{}ms，异常信息：{}", costTime, e.getMessage());
+            log.error("---执行失败:{}, import:{}, method:{}, 详细:{}", describe,className, methodName,methodArgs);
+            log.error("耗时:{}ms, 异常信息:{}", costTime, e.getMessage());
             throw e;
         }
         return result;

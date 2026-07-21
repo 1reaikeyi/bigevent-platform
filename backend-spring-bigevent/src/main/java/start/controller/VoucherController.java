@@ -66,7 +66,7 @@ public class VoucherController {
     }
 
     @PostMapping("/pay")
-    public Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
+    public Result redisLock(@RequestBody VoucherOrder voucherOrder) {
         VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
         if (voucherSeckill == null) {
             return Result.error("失败");
@@ -74,14 +74,15 @@ public class VoucherController {
         Map<String, Object> claims = ThreadLocalContextHolder.get();
         Long userId = Long.parseLong(claims.get(JwtConstant.ID).toString());
         // 获取锁
-        RedisLock redisLock = new RedisLock(stringRedisTemplate, "voucherSeckill:" + userId);
+        RedisLock redisLock = new RedisLock(stringRedisTemplate, "redisson:voucherSeckill:" + userId + ":" + voucherOrder.getVoucherId());
         boolean locked = redisLock.getLocked(10);
         if (!locked) {
             throw new RuntimeException("不要重复");
         }
         try {
-            voucherOrder.setId(redisID.createId("order"));
+            voucherOrder.setId(redisID.createId("pay"));
             voucherOrder.setUserId(userId);
+            voucherOrder.setVoucherId(voucherOrder.getVoucherId());
             return ((VoucherController) AopContext.currentProxy()).paySuccess(voucherOrder);
         } finally {
             redisLock.unlock();

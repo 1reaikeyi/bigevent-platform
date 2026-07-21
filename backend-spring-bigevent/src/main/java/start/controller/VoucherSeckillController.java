@@ -1,15 +1,12 @@
 package start.controller;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import common.ThreadLocalContext.ThreadLocalParam;
 import common.result.Result;
 import model.entity.VoucherOrder;
 import model.entity.VoucherSeckill;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
-import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,7 +18,8 @@ import service.id.RedisID;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 使用redisson,RedissonClient
+ * 使用redisson分布式锁实现秒杀 - 同步版本
+ * 支付成功逻辑已迁移至 VoucherOrderService.paySuccess()
  */
 @RestController
 @RequestMapping("/voucherSeckill")
@@ -32,58 +30,49 @@ public class VoucherSeckillController {
     private VoucherOrderService voucherOrderService;
     @Autowired
     private RedisID redisID;
-//    @Resource(name = "redissonClient")
     @Autowired
     private RedissonClient redissonClient;
 
     @PostMapping("/pay")
-    public Result payVoucher(@RequestBody VoucherOrder voucherOrder) {
+    public Result redisLock(@RequestBody VoucherOrder voucherOrder) {
+        // 校验秒杀活动是否有效
         VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
         if (voucherSeckill == null) {
-            return Result.error("失败");
+            return Result.error("秒杀活动不存在或已结束");
         }
+
+        // 获取当前用户ID
         Long userId = ThreadLocalParam.getUserId();
-        RLock redisLock = redissonClient.getLock("redisson:voucherSeckill:" + userId);
+
+        // 使用 Redisson 分布式锁防止重复下单
+        RLock redisLock = redissonClient.getLock("redisson:voucherSeckill:" + userId + ":" + voucherOrder.getVoucherId());
         boolean locked = false;
         try {
             // 尝试获取锁，等待10秒，持有10秒
             locked = redisLock.tryLock(10, 10, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("获取锁失败");
         }
-        if (!locked) {
-            throw new RuntimeException("不要重复");
-        }
-        try {
-            voucherOrder.setId(redisID.createId("order"));
-            voucherOrder.setUserId(userId);
-            return ((VoucherSeckillController) AopContext.currentProxy()).paySuccess(voucherOrder);
-        } finally {
-            redisLock.unlock();
-        }
-    }
-    @Transactional(rollbackFor = Exception.class)
-    public Result paySuccess(VoucherOrder voucherOrder) {
-        // 一人一单检查
-        Long count = voucherOrderService.count(new LambdaQueryWrapper<VoucherOrder>()
-                .eq(VoucherOrder::getUserId, voucherOrder.getUserId())
-                .eq(VoucherOrder::getVoucherId, voucherOrder.getVoucherId()));
-        if (count > 0) {
-            throw new RuntimeException("一人一单");
-        }
-        // 扣库存
-        boolean success = voucherSeckillService.lambdaUpdate()
-                .eq(VoucherSeckill::getVoucherId, voucherOrder.getVoucherId())
-                .gt(VoucherSeckill::getStock, 0)
-                .setSql("stock = stock - 1")
-                .update();
-        if (!success) {
-            throw new RuntimeException("库存不够");
-        }
-        // 保存订单
-        voucherOrderService.save(voucherOrder);
-        return Result.success("paySuccess");
-    }
 
+        if (!locked) {
+            throw new RuntimeException("请勿重复下单");
+        }
+
+        try {
+            // 设置订单基础信息
+            voucherOrder.setId(redisID.createId("pay"));
+            voucherOrder.setUserId(userId);
+            voucherOrderService.paySuccess(voucherOrder);
+            voucherOrder.setStatus(1L);
+
+            return Result.success("paySuccess");
+        } finally {
+            // 确保锁被释放
+            if (locked && redisLock.isHeldByCurrentThread()) {
+                redisLock.unlock();
+            }
+        }
+    }
 }
 

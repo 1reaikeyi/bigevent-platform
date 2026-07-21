@@ -8,7 +8,7 @@ const router = createRouter({
     { path: '/register', component: () => import('@/views/login/Login.vue') }, // 注册页
     {
       path: '/',
-      component: () => import('@/views/login/Container.vue'),
+      component: () => import('@/layout/Container.vue'),
       redirect: '/article/category',
       children: [
         { path: '/article/category', component: () => import('@/views/article/Category.vue') },
