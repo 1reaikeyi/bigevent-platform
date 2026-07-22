@@ -5,6 +5,8 @@
 local voucherId = ARGV[1]
 -- 获取参数：用户id
 local userId = ARGV[2]
+-- 获取参数：订单id
+local orderId = ARGV[3]
 
 -- 定义key
 local stockKey = "voucherSeckill:stock:" .. voucherId
@@ -29,4 +31,5 @@ redis.call('incrby',stockKey,-1)
 redis.call('sadd',orderKey,userId)
 
 -- 5. 下单成功，返回0
+redis.call('xadd','stream.order','*','voucherId',voucherId,'userId',userId,'id',orderId)
 return 0

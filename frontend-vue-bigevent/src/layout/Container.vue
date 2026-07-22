@@ -59,7 +59,7 @@ const handleCommand = async (key) => {
 
     <el-container>
       <el-header>
-        <div>大事件系统==>当前用户呢称是:<strong>{{ userStore.user?.nickName || userStore.user?.userName || '用户' }}</strong></div>
+        <div>weino评论==>当前用户呢称是:<strong>{{ userStore.user?.nickName || userStore.user?.userName || '用户' }}</strong></div>
         <el-dropdown placement="bottom-end" @command="handleCommand">
           <span class="el-dropdown__box">
             <el-avatar :src="userStore.user?.userPic || avatar" />
@@ -76,9 +76,9 @@ const handleCommand = async (key) => {
         </el-dropdown>
       </el-header>
       <el-main>
-        <router-view></router-view>
+        <router-view>weino评论</router-view>
       </el-main>
-      <el-footer>大事件</el-footer>
+      <el-footer></el-footer>
     </el-container>
   </el-container>
 </template>
@@ -90,7 +90,7 @@ const handleCommand = async (key) => {
     background-color: #232323;
     &__logo {
       height: 120px;
-      background: url('@/assets/logo.png') no-repeat center / 120px auto;
+      background: url('@/assets/logo1.png') no-repeat center / 240px auto;
     }
     .el-menu {
       border-right: none;

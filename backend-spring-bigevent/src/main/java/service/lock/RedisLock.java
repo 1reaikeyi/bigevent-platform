@@ -28,7 +28,6 @@ public class RedisLock implements ILock{
     }
     /**
      * 获取锁
-     *
      * @param timeoutSec
      * @return
      */
@@ -43,7 +42,7 @@ public class RedisLock implements ILock{
     }
 
     /**
-     * 释放锁
+     * 2.0释放锁
      */
     @Override
     public void unlock() {
@@ -52,14 +51,19 @@ public class RedisLock implements ILock{
         String value = VALUE_PREFIX+id;
         stringRedisTemplate.execute(REDISSCRIPT, List.of(key),value);
     }
-//    @Override
-//    public void unlook() {
-//        String key = KEY_PREFIX + name;
-//        String value = stringRedisTemplate.opsForValue().get(key);
-//        String validtor_id = VALUE_PREFIX + Thread.currentThread().getId();
-//        if (value.equals(validtor_id)) {
-//            stringRedisTemplate.delete(KEY_PREFIX+name);
-//        }
-//    }
+
+    /**
+     * 1.0 释放锁
+     @Override
+     public void unlook() {
+     String key = KEY_PREFIX + name;
+     String value = stringRedisTemplate.opsForValue().get(key);
+     String validtor_id = VALUE_PREFIX + Thread.currentThread().getId();
+     if (value.equals(validtor_id)) {
+     stringRedisTemplate.delete(KEY_PREFIX+name);
+     }
+     }
+     */
+
 
 }
