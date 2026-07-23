@@ -10,7 +10,7 @@
 
 
 
-![封面](说明/原型功能/one.png)
+<img src="说明/原型功能/one.png" alt="封面" style="zoom:40%;" />
 
 # 项目结构
 
