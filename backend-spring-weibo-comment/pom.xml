@@ -9,7 +9,7 @@
         <relativePath/>
     </parent>
     <groupId>org.example</groupId>
-    <artifactId>backend-spring-bigevent</artifactId>
+    <artifactId>backend-spring-weibo-comment</artifactId>
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>

@@ -1,4 +1,4 @@
-# Weibo-comment-platform 大众点评
+# Weibo-comment大众点评
 
 基于 Spring Boot + Vue 3 的大众评论，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀，笔记点赞评论核心功能。
 
@@ -10,7 +10,7 @@
 
 
 
-![封面](说明\原型功能\10.png)
+![封面](说明\原型功能\one.png)
 
 # 项目结构
 
