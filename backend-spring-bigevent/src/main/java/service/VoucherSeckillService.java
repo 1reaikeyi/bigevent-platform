@@ -1,6 +1,7 @@
 package service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import model.entity.VoucherOrder;
 import model.entity.VoucherSeckill;
 
 /**
@@ -8,4 +9,5 @@ import model.entity.VoucherSeckill;
  */
 public interface VoucherSeckillService extends IService<VoucherSeckill> {
     VoucherSeckill voucherSeckillValid(Long id);
+
 }

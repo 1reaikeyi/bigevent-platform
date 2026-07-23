@@ -66,7 +66,7 @@ public class VoucherController {
 
     // 秒杀订单处理线程池 - 单线程确保顺序处理
     private static final ExecutorService SCEKILL_EXECUTOR = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "voucher-seckill-order-handler");
+        Thread t = new Thread(r, "voucher-order-handler");
         t.setDaemon(true);
         return t;
     });
@@ -76,7 +76,7 @@ public class VoucherController {
      */
     @PostConstruct
     public void init() {
-        SCEKILL_EXECUTOR.submit(new VoucherController.HandleOrderTask());
+        SCEKILL_EXECUTOR.submit(new VoucherController.HandleOrderTaskByList());
     }
     @PreDestroy
     public void destroy() {
@@ -137,14 +137,14 @@ public class VoucherController {
         }
          return Result.success(orderId);
     }
-    private class HandleOrderTask implements Runnable {
+    private class HandleOrderTaskByList implements Runnable {
         @Override
         public void run() {
             while (true) {
                  try {
                     // 从队列中取出订单（阻塞等待）
                     VoucherOrder voucherOrder = orderQueue.take();
-
+                    log.info("检验值voucherOrder:{}", voucherOrder);
                     ILock redisLock = new RedisLock(stringRedisTemplate,
                             "redisson:voucherSeckill:" + voucherOrder.getUserId() + ":" + voucherOrder.getVoucherId());
                     boolean locked = false;
@@ -159,12 +159,11 @@ public class VoucherController {
                         redisLock.unlock();
                     }
 
-                 } catch (InterruptedException e) {
-                    // 线程被中断，退出循环
-                    Thread.currentThread().interrupt();
-                    break;
                  } catch (Exception e) {
-                    log.error("订单处理线程异常: " + e.getMessage());
+                     // 线程被中断，退出循环
+                     Thread.currentThread().interrupt();
+                     log.error("订单处理线程异常: " + e.getMessage());
+                     break;
                  }
             }
         }

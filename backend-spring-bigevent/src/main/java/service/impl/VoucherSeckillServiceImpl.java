@@ -2,13 +2,19 @@ package service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import common.result.Result;
+import model.entity.VoucherOrder;
 import model.entity.VoucherSeckill;
 import mapper.VoucherSeckillMapper;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Autowired;
+import service.VoucherOrderService;
 import service.VoucherSeckillService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 秒杀优惠券服务实现类 - 实现秒杀优惠券相关业务逻辑
@@ -16,6 +22,7 @@ import java.time.LocalDateTime;
 @Service
 @Slf4j
 public class VoucherSeckillServiceImpl extends ServiceImpl<VoucherSeckillMapper, VoucherSeckill> implements VoucherSeckillService {
+
     @Override
     public VoucherSeckill voucherSeckillValid(Long id) {
         VoucherSeckill voucherSeckill = super.getById(id);
@@ -31,5 +38,6 @@ public class VoucherSeckillServiceImpl extends ServiceImpl<VoucherSeckillMapper,
         }
         return voucherSeckill;
     }
+
 
 }

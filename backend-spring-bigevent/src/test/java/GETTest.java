@@ -1,6 +1,9 @@
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.BooleanUtil;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import start.BigEventApplication;
 
 import java.util.HashSet;
 import java.util.Set;

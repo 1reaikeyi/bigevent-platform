@@ -31,5 +31,5 @@ redis.call('incrby',stockKey,-1)
 redis.call('sadd',orderKey,userId)
 
 -- 5. 下单成功，返回0
-redis.call('xadd','stream.order','*','voucherId',voucherId,'userId',userId,'id',orderId)
+redis.call('xadd','stream.order','*','voucherId',voucherId,'userId',userId,'orderId',orderId)
 return 0

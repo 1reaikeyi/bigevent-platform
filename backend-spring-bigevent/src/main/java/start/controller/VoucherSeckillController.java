@@ -43,36 +43,12 @@ public class VoucherSeckillController {
 
         // 获取当前用户ID
         Long userId = ThreadLocalParam.getUserId();
-
-        // 使用 Redisson 分布式锁防止重复下单
-        RLock redisLock = redissonClient.getLock("redisson:voucherSeckill:" + userId + ":" + voucherOrder.getVoucherId());
-        boolean locked = false;
-        try {
-            // 尝试获取锁，等待10秒，持有10秒
-            locked = redisLock.tryLock(10, 10, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("获取锁失败");
-        }
-
-        if (!locked) {
-            throw new RuntimeException("请勿重复下单");
-        }
-
-        try {
-            // 设置订单基础信息
-            voucherOrder.setId(redisID.createId("pay"));
-            voucherOrder.setUserId(userId);
-            voucherOrderService.paySuccess(voucherOrder);
-            voucherOrder.setStatus(1L);
-
-            return Result.success("paySuccess");
-        } finally {
-            // 确保锁被释放
-            if (locked && redisLock.isHeldByCurrentThread()) {
-                redisLock.unlock();
-            }
-        }
+        // 设置订单基础信息
+        voucherOrder.setId(redisID.createId("orderId"));
+        voucherOrder.setUserId(userId);
+        voucherOrder.setStatus(1L);
+        voucherOrderService.secondKill(voucherOrder);
+        return Result.success("paySuccess");
     }
 }
 

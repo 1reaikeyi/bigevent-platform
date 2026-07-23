@@ -1,12 +1,48 @@
 # Weibo-comment-platform 大众点评
 
-基于 Spring Boot + Vue 3 的大众评论，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀核心功能。
+基于 Spring Boot + Vue 3 的大众评论，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀，笔记点赞评论核心功能。
 
 ------
 
 
 
 # 后端说明
+
+
+
+![封面](说明\原型功能\10.png)
+
+# 项目结构
+
+```
+big-event/
+├── backend-spring-bigevent/           # 后端代码（Spring Boot）
+├── database-sql/                      # 数据库脚本目录
+│   ├── sql.txt                        # 数据库初始化SQL
+│   └── 数据库设计文档.md               # 完整的数据库设计说明
+├── frontend-vue-bigevent/             # 前端代码（Vue 3）
+└── 说明/                              # 项目说明文档
+      ├── 原型功能/                      # 前端原型截图
+      ├── 并发测试/                      # 秒杀并发测试结果
+      │   ├── 乐观锁解决超卖.png          # 乐观锁方案测试截图
+      │   ├── 分布式锁解决集群一人多单.png  # 分布式锁方案测试截图
+      │   ├── 悲观锁集群不能一人一单.png    # 悲观锁方案测试截图
+      │   ├── redis同步.png               # Redis同步测试截图
+      │   ├── redis同步.txt               # Redis同步测试Slf4j日志
+      │   ├── redis异步.png               # Redis异步（队列）测试截图
+      │   ├── redis异步.txt               # Redis异步（队列）测试Slf4j日志
+      │   ├── stream异步.png              # Redis Stream异步测试截图
+      │   └── stream异步.txt              # Redis Stream异步测试Slf4j日志
+      └── 大事件接口文档.md              # 完整的API接口文档（V2.0）
+```
+
+# 环境要求
+
+- JDK 17+
+- Spring Boot 3+
+- Node.js 20.19.0+ 或 22.12.0+
+- MySQL 8.0+
+- Redis 7.0+
 
 ## 一、用户管理模块
 
@@ -684,23 +720,219 @@ private class HandleOrderTask implements Runnable {
 
 **修复方案**：使用Lua脚本释放锁，只有锁的持有者才能释放
 
-### 秒杀控制器演进过程
+### 三个秒杀控制器详解
 
-> 【临时备注】这个项目经历了从同步秒杀到异步秒杀的演进过程，两个控制器并存：
+本项目实现了三种不同架构的秒杀控制器，分别适用于不同的并发场景：
 
-**VoucherSeckillController（同步版）**：
+#### 1. VoucherSeckillController（同步版本）
+
+**架构特点**：
 - 直接操作数据库完成扣库存和保存订单
-- 使用Redisson分布式锁保证一人一单
-- 适用于并发量较低的场景
+- 使用 Redisson 分布式锁保证一人一单
+- 同步处理，用户请求需要等待数据库操作完成
 
-**VoucherOrderController（异步版）**：
-- 先通过Lua脚本在Redis中完成校验
-- 订单放入内存队列异步处理
-- 后台线程使用Redisson锁处理数据库操作
-- 适用于高并发场景
+**核心代码实现**：
+```java
+// VoucherSeckillController.java
+@PostMapping("/pay")
+public Result redisLock(@RequestBody VoucherOrder voucherOrder) {
+    // 校验秒杀活动是否有效
+    VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
+    if (voucherSeckill == null) {
+        return Result.error("秒杀活动不存在或已结束");
+    }
+    
+    // 获取当前用户ID，设置订单基础信息
+    Long userId = ThreadLocalParam.getUserId();
+    voucherOrder.setId(redisID.createId("orderId"));
+    voucherOrder.setUserId(userId);
+    voucherOrder.setStatus(1L);
+    
+    // 直接调用同步下单方法
+    voucherOrderService.secondKill(voucherOrder);
+    return Result.success("paySuccess");
+}
+```
 
-**为什么做这个演进？**
+**适用场景**：并发量较低的场景（单机几百QPS），实现简单，易于调试。
+
+---
+
+#### 2. VoucherController（异步版本 - 内存队列）
+
+**架构特点**：
+- 使用 Lua 脚本在 Redis 中完成库存校验和扣减
+- 使用 `ArrayBlockingQueue` 内存队列存储待处理订单
+- 单线程后台处理器从队列中取出订单完成数据库操作
+- 使用自定义 `RedisLock` 分布式锁防止重复处理
+
+**核心代码实现**：
+```java
+// VoucherController.java - 下单接口
+@PostMapping("/pay")
+public Result redisLock(@RequestBody VoucherOrder voucherOrder) {
+    // 校验秒杀活动
+    VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
+    if (voucherSeckill == null) {
+        return Result.error("秒杀活动不存在或已结束");
+    }
+    
+    Long userId = ThreadLocalParam.getUserId();
+    Long orderId = redisID.createId("pay");
+    
+    // 执行Lua脚本：校验库存和重复下单
+    Long result = stringRedisTemplate.execute(REDIS_SCRIPT,
+            List.of(),
+            voucherOrder.getVoucherId().toString(),
+            userId.toString(),
+            orderId.toString());
+    
+    if (result != 0) {
+        return Result.error(result == 1 ? "库存不够" : "重复下单");
+    }
+    
+    // 设置订单信息，放入内存队列异步处理
+    voucherOrder.setId(orderId);
+    voucherOrder.setUserId(userId);
+    voucherOrder.setStatus(1L);
+    boolean offer = orderQueue.offer(voucherOrder);
+    if (!offer) {
+        return Result.error("系统繁忙，请稍后重试");
+    }
+    return Result.success(orderId);
+}
+
+// 异步订单处理线程
+private class HandleOrderTaskByList implements Runnable {
+    @Override
+    public void run() {
+        while (true) {
+            try {
+                // 从队列中取出订单（阻塞等待）
+                VoucherOrder voucherOrder = orderQueue.take();
+                
+                // 使用RedisLock分布式锁防止重复处理
+                ILock redisLock = new RedisLock(stringRedisTemplate,
+                        "redisson:voucherSeckill:" + voucherOrder.getUserId() + ":" + voucherOrder.getVoucherId());
+                boolean locked = redisLock.getLocked(10);
+                if (!locked) {
+                    continue;
+                }
+                
+                try {
+                    // 执行实际的下单逻辑
+                    voucherOrderService.paySuccess(voucherOrder);
+                } finally {
+                    redisLock.unlock();
+                }
+            } catch (Exception e) {
+                Thread.currentThread().interrupt();
+                log.error("订单处理线程异常: " + e.getMessage());
+                break;
+            }
+        }
+    }
+}
+```
+
+**适用场景**：中等并发场景（单机几千QPS），内存队列速度快，但重启后队列数据会丢失。
+
+---
+
+#### 3. VoucherOrderController（异步版本 - Redis Stream）
+
+**架构特点**：
+- 使用 Lua 脚本在 Redis 中完成库存校验和扣减
+- 使用 **Redis Stream** 作为消息队列，支持消息持久化
+- 使用消费组模式（Consumer Group），支持多实例部署
+- 使用 Redisson 分布式锁防止重复处理
+
+**核心代码实现**：
+```java
+// VoucherOrderController.java - 下单接口
+@PostMapping("/pay")
+public Result redisproLock(@RequestBody VoucherOrder voucherOrder) {
+    // 校验秒杀活动
+    VoucherSeckill voucherSeckill = voucherSeckillService.voucherSeckillValid(voucherOrder.getVoucherId());
+    if (voucherSeckill == null) {
+        return Result.error("秒杀活动不存在或已结束");
+    }
+    
+    Long userId = ThreadLocalParam.getUserId();
+    Long orderId = redisID.createId("order");
+    
+    // 执行Lua脚本：校验库存和重复下单
+    Long result = stringRedisTemplate.execute(REDIS_SCRIPT,
+            List.of(),
+            voucherOrder.getVoucherId().toString(),
+            userId.toString(),
+            orderId.toString());
+    
+    if (result != 0) {
+        return Result.error(result == 1 ? "库存不够" : "重复下单");
+    }
+    return Result.success(orderId);
+}
+
+// 异步订单处理线程（从Redis Stream读取）
+private class HandleOrderTask implements Runnable {
+    @Override
+    public void run() {
+        String streamKey = "stream.order";
+        while (true) {
+            // XREADGROUP GROUP g1 c1 COUNT 10 BLOCK 2000 STREAMS stream.order >
+            List<MapRecord<String,Object,Object>> messageList = stringRedisTemplate.opsForStream().read(
+                    Consumer.from("g1", "c1"),
+                    StreamReadOptions.empty().count(10).block(Duration.ofSeconds(2)),
+                    StreamOffset.create(streamKey, ReadOffset.lastConsumed()));
+            
+            if (messageList == null || messageList.isEmpty()) {
+                continue;
+            }
+            
+            // 解析订单信息
+            MapRecord<String,Object,Object> record = messageList.get(0);
+            Map<Object,Object> map = record.getValue();
+            VoucherOrder voucherOrder = VoucherOrder.builder()
+                    .voucherId(Long.parseLong(map.get("voucherId").toString()))
+                    .userId(Long.parseLong(map.get("userId").toString()))
+                    .id(Long.parseLong(map.get("orderId").toString()))
+                    .build();
+            
+            // 执行下单逻辑
+            voucherOrderService.secondKill(voucherOrder);
+            
+            // 确认消息已处理
+            stringRedisTemplate.opsForStream().acknowledge(streamKey, "g1", record.getId());
+        }
+    }
+}
+```
+
+**适用场景**：高并发场景（单机几万QPS），消息持久化，支持多实例部署，故障恢复能力强。
+
+---
+
+### 三种架构对比
+
+| 维度 | VoucherSeckillController | VoucherController | VoucherOrderController |
+| :--- | :--- | :--- | :--- |
+| **处理方式** | 同步 | 异步（内存队列） | 异步（Redis Stream） |
+| **队列类型** | 无 | ArrayBlockingQueue | Redis Stream |
+| **分布式锁** | Redisson | 自定义RedisLock | Redisson |
+| **消息持久化** | 无 | 无 | 有 |
+| **多实例支持** | 支持（锁保证） | 不支持（内存队列） | 支持（消费组） |
+| **吞吐量** | 低（几百QPS） | 中（几千QPS） | 高（几万QPS） |
+| **故障恢复** | 无状态 | 队列数据丢失 | 消息可恢复 |
+| **适用场景** | 测试/低并发 | 中等并发 | 生产高并发 |
+
+### 演进过程总结
+
+**为什么从同步版演进到异步版？**
 > A：同步版本在高并发下会导致数据库压力过大，响应时间变长。异步版本将热点操作转移到Redis，数据库操作异步化，大大提升了系统的吞吐量和响应速度。
+
+**为什么从内存队列演进到Redis Stream？**
+> A：内存队列在应用重启后数据会丢失，且不支持多实例部署。Redis Stream提供消息持久化和消费组机制，适合生产环境的高可用部署。
 
 ---
 
@@ -848,33 +1080,109 @@ return 0
 
 ### 秒杀流程说明
 
-秒杀逻辑位于 `VoucherOrderController` 中，`payVoucher` 方法使用 **Lua脚本预校验 + 异步队列** 机制，核心流程如下：
+本项目提供三个秒杀接口，分别对应不同的架构实现：
 
-1. **创建优惠券**：通过 `POST /voucher/create` 接口创建优惠券及关联的秒杀活动配置
+| 接口 | 控制器 | 处理方式 |
+| :--- | :--- | :--- |
+| `POST /voucherSeckill/pay` | VoucherSeckillController | 同步处理 |
+| `POST /voucher/pay` | VoucherController | 异步（内存队列） |
+| `POST /voucherOrder/pay` | VoucherOrderController | 异步（Redis Stream） |
 
-2. **用户下单**：通过 `POST /voucherOrder/pay` 接口提交秒杀订单
+#### 统一前置步骤
 
-3. **Lua脚本校验**：执行Redis Lua脚本，完成以下校验：
-   - 判断库存是否充足
-   - 判断用户是否已下单（一人一单）
-   - 扣减库存
-   - 记录下单用户
+**1. 创建优惠券**：通过 `POST /voucher/create` 接口创建优惠券及关联的秒杀活动配置
 
-4. **生成订单ID**：使用RedisID生成分布式唯一订单ID
+```java
+@PostMapping("/create")
+public Result createVoucher(@RequestBody VoucherDTO voucherDTO) {
+    Voucher voucher = BeanUtil.toBean(voucherDTO, Voucher.class);
+    voucherService.save(voucher);
+    // 创建秒杀活动并初始化Redis库存
+    List<VoucherSeckill> voucherSeckillList = voucherDTO.getVoucherSeckillList().stream()
+            .map(vs -> VoucherSeckill.builder()
+                    .stock(vs.getStock())
+                    .beginTime(vs.getBeginTime())
+                    .endTime(vs.getEndTime())
+                    .voucherId(voucher.getId())
+                    .build())
+            .toList();
+    // 将库存同步到Redis
+    for (VoucherSeckill vs : voucherSeckillList) {
+        stringRedisTemplate.opsForValue().set(
+            "voucherSeckill:stock:" + voucher.getId(), 
+            vs.getStock().toString());
+    }
+    voucherSeckillService.saveBatch(voucherSeckillList);
+    return Result.success("createVoucher");
+}
+```
 
-5. **放入异步队列**：将订单对象放入内存队列，异步处理
+**2. Lua脚本预校验**（异步版本）：所有异步版本都使用相同的Lua脚本完成前置校验
 
-6. **后台线程处理**：从队列中取出订单，使用Redisson分布式锁防止重复处理
+```lua
+-- redis-seckill.lua
+local voucherId = ARGV[1]
+local userId = ARGV[2]
+local orderId = ARGV[3]
 
-7. **一人一单校验**：在事务中基于用户ID和优惠券ID查询已存在订单
+local stockKey = "voucherSeckill:stock:" .. voucherId
+local orderKey = "voucherSeckill:order:" .. voucherId
+local streamKey = "stream.order"
 
-8. **原子库存扣减**：使用 MyBatis Plus 的乐观锁 CAS 操作保证库存扣减的原子性
+-- 1. 判断库存
+if tonumber(redis.call('get', stockKey)) <= 0 then
+    return 1  -- 库存不足
+end
 
-9. **订单创建**：保存订单记录
+-- 2. 判断是否已下单
+if redis.call('sismember', orderKey, userId) > 0 then
+    return 2  -- 重复下单
+end
 
-10. **返回结果**：返回下单成功或失败信息
+-- 3. 扣减库存
+redis.call('incrby', stockKey, -1)
 
-> **注意**：同步版本（VoucherSeckillController）使用 synchronized + RedisLock 双重锁机制，但性能不如异步版本。
+-- 4. 记录下单用户
+redis.call('sadd', orderKey, userId)
+
+-- 5. 发送消息到Stream（VoucherOrderController使用）
+redis.call('xadd', streamKey, '*', 'voucherId', voucherId, 'userId', userId, 'orderId', orderId)
+
+-- 6. 成功
+return 0
+```
+
+#### 同步版本流程（VoucherSeckillController）
+
+```
+用户请求 → 校验秒杀活动 → 生成订单ID → 直接调用secondKill() → 扣库存+保存订单 → 返回结果
+```
+
+#### 异步版本流程（VoucherController - 内存队列）
+
+```
+用户请求 → 校验秒杀活动 → Lua脚本校验 → 放入ArrayBlockingQueue → 返回订单ID
+                                                              ↓
+                                                    后台线程 take() → RedisLock → paySuccess() → 扣库存+保存订单
+```
+
+#### 异步版本流程（VoucherOrderController - Redis Stream）
+
+```
+用户请求 → 校验秒杀活动 → Lua脚本校验（自动XADD到Stream）→ 返回订单ID
+                                                                    ↓
+                                                         XREADGROUP读取 → 解析订单 → secondKill() → 扣库存+保存订单 → ACK确认
+```
+
+#### 数据库操作阶段（所有版本共用）
+
+无论是同步还是异步，最终都需要执行以下数据库操作：
+
+1. **一人一单校验**：在事务中基于用户ID和优惠券ID查询已存在订单
+2. **原子库存扣减**：使用 MyBatis Plus 的乐观锁 CAS 操作保证库存扣减的原子性
+3. **订单创建**：保存订单记录
+
+> **注意**：同步版本直接在请求线程中执行数据库操作，而异步版本在后台线程池中执行。
 
 ---
 
@@ -911,34 +1219,6 @@ public Result seckill(Long voucherId) {
 }
 ```
 > 本项目改进：先用Lua脚本在Redis中完成校验，再放入异步队列，后台线程处理数据库写入。
-
----
-
-# 项目结构
-
-```
-big-event/
-├── backend-spring-bigevent/           # 后端代码（Spring Boot）
-├── database-sql/                      # 数据库脚本目录
-│   ├── sql.txt                        # 数据库初始化SQL
-│   └── 数据库设计文档.md               # 完整的数据库设计说明
-├── frontend-vue-bigevent/             # 前端代码（Vue 3）
-└── 说明/                              # 项目说明文档
-    ├── 原型功能/                      # 前端原型截图
-    ├── 并发测试/                      # 秒杀并发测试结果
-    │   ├── 乐观锁解决超卖.png
-    │   ├── 分布式锁解决集群一人多单.png
-    │   └── 悲观锁集群不能一人一单.png
-    └── 大事件接口文档.md              # 完整的API接口文档（V2.0）
-```
-
-# 环境要求
-
-- JDK 17+
-- Spring Boot 3+
-- Node.js 20.19.0+ 或 22.12.0+
-- MySQL 8.0+
-- Redis 7.0+
 
 ---
 

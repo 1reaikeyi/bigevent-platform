@@ -59,7 +59,7 @@ const handleCommand = async (key) => {
 
     <el-container>
       <el-header>
-        <div>weino评论==>当前用户呢称是:<strong>{{ userStore.user?.nickName || userStore.user?.userName || '用户' }}</strong></div>
+        <div>weibo评论==>当前用户呢称是:<strong>{{ userStore.user?.nickName || userStore.user?.userName || '用户' }}</strong></div>
         <el-dropdown placement="bottom-end" @command="handleCommand">
           <span class="el-dropdown__box">
             <el-avatar :src="userStore.user?.userPic || avatar" />
@@ -76,7 +76,7 @@ const handleCommand = async (key) => {
         </el-dropdown>
       </el-header>
       <el-main>
-        <router-view>weino评论</router-view>
+        <router-view></router-view>
       </el-main>
       <el-footer></el-footer>
     </el-container>

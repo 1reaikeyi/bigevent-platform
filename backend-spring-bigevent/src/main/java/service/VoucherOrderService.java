@@ -17,4 +17,10 @@ public interface VoucherOrderService extends IService<VoucherOrder> {
      * @param voucherOrder 订单对象
      */
     void paySuccess(VoucherOrder voucherOrder);
+
+    /**
+     * 使用redis锁
+     * @param voucherOrder
+     */
+    void secondKill(VoucherOrder voucherOrder);
 }
