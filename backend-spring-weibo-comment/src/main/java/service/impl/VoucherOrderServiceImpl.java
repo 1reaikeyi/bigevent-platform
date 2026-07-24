@@ -64,8 +64,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         RLock redisLock = redissonClient.getLock("redisson:voucherSeckill:" + voucherOrder.getUserId() + ":" + voucherOrder.getVoucherId());
         boolean locked = false;
         try {
-            // 尝试获取锁，等待10秒，持有10秒
-            locked = redisLock.tryLock(10, 10, TimeUnit.SECONDS);
+            // 尝试获取锁，等待5秒
+            locked = redisLock.tryLock(5, 30, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("获取锁失败");

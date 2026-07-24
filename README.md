@@ -1,6 +1,6 @@
 # Weibo-comment大众点评
 
-基于 Spring Boot + Vue 3 的大众评论，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀，笔记点赞评论核心功能。
+基于 Spring Boot + Vue 3 的Weibo-comment大众点评，使用redis+nginx的分布式系统，提供用户认证、文章管理、分类管理、优惠券秒杀，笔记点赞评论核心功能。
 
 ------
 
@@ -10,7 +10,9 @@
 
 
 
-<img src="说明/原型功能/one.png" alt="封面" style="zoom:40%;" />
+![封面](说明/原型功能/two.png)
+
+![封面](说明/原型功能/one.png)
 
 # 项目结构
 
@@ -23,17 +25,19 @@ big-event/
 ├── frontend-vue-bigevent/             # 前端代码（Vue 3）
 └── 说明/                              # 项目说明文档
       ├── 原型功能/                      # 前端原型截图
-      ├── 并发测试/                      # 秒杀并发测试结果
+      ├── 并发测试结果/                      # 秒杀并发测试结果
       │   ├── 乐观锁解决超卖.png          # 乐观锁方案测试截图
       │   ├── 分布式锁解决集群一人多单.png  # 分布式锁方案测试截图
       │   ├── 悲观锁集群不能一人一单.png    # 悲观锁方案测试截图
-      │   ├── redis同步.png               # Redis同步测试截图
-      │   ├── redis同步.txt               # Redis同步测试Slf4j日志
-      │   ├── redis异步.png               # Redis异步（队列）测试截图
-      │   ├── redis异步.txt               # Redis异步（队列）测试Slf4j日志
-      │   ├── stream异步.png              # Redis Stream异步测试截图
-      │   └── stream异步.txt              # Redis Stream异步测试Slf4j日志
-      └── 大事件接口文档.md              # 完整的API接口文档（V2.0）
+      │   ├── redis同步.png         # Redis同步测试截图
+      │   ├── redis同步.txt         # Redis同步测试Slf4j日志
+      │   ├── redis异步.png         # Redis异步（队列）测试截图
+      │   ├── redis异步.txt         # Redis异步（队列）测试Slf4j日志
+      │   ├── stream异步.png        # Redis Stream异步测试截图
+      │   └── stream异步.txt        # Redis Stream异步测试Slf4j日志
+      ├── postman测试文档            # postman测试文档
+      ├── 高并发测试文档              # 高并发测试文档
+      └── 接口文档.md              # 完整的API接口文档
 ```
 
 # 环境要求
@@ -186,10 +190,10 @@ Q：为什么不直接用@Cacheable注解？
     ↓
 缓存存在？
     ├─ 是 → 检查逻辑过期？
-    │         ├─ 未过期 → 直接返回缓存数据
-    │         └─ 已过期 → 获取分布式锁
-    │                     ├─ 获取成功 → 查询数据库 → 更新缓存 → 返回新数据
-    │                     └─ 获取失败 → 返回旧缓存数据
+    │      ├─ 未过期 → 直接返回缓存数据
+    │      └─ 已过期 → 获取分布式锁
+    │                  ├─ 获取成功 → 查询数据库 → 更新缓存 → 返回新数据
+    │                  └─ 获取失败 → 返回旧缓存数据
     └─ 否 → 查询数据库 → 设置缓存（逻辑过期时间）→ 返回数据
 ```
 
@@ -515,7 +519,7 @@ Q：文件命名为什么用UUID？
 **架构设计**：
 ```
 文件上传 → FileController（本地）/ FileOssController（阿里云OSS）→ 返回文件访问URL
-文件下载 → FileController（本地）/ FileOssController（阿里云OSS）→ 返回文件流
+文件下载 → FileController（本地）/ FileOssController（阿里云OSS）→ 返回需要下载的文件流
 ```
 
 ### 编码阶段
@@ -596,17 +600,78 @@ Q：为什么要异步处理订单？
 > A：如果同步处理，用户下单请求需要等待数据库操作完成，响应时间长。异步处理可以先返回订单ID，后台线程慢慢处理数据库写入，提升用户体验。
 
 **秒杀架构设计**：
+
+#### 同步版本流程（VoucherSeckillController）
+
 ```
-用户请求 → Lua脚本校验（库存+重复下单）→ 成功→放入异步队列 → 后台线程处理（扣库存+保存订单）
-                                      ↓
-                                 失败→直接返回
+用户请求 → 校验秒杀活动 → 生成订单ID → 直接调用secondKill() → 扣库存+保存订单 → 返回结果
+```
+
+#### 异步版本流程（VoucherController - 内存队列）
+
+```
+用户请求 → 校验秒杀活动 → Lua脚本校验 → 放入ArrayBlockingQueue → 返回订单ID
+                                                              ↓
+                                        后台线程 take() → RedisLock → paySuccess() → 扣库存+保存订单
+```
+
+#### 异步版本流程（VoucherOrderController - Redis Stream）
+
+```
+用户请求 → 校验秒杀活动 → Lua脚本校验（自动XADD到Stream）→ 返回订单ID
+                                                         ↓
+                                XREADGROUP读取 → 解析订单 → secondKill() → 扣库存+保存订单 → ACK确认
+```
+
+#### 数据库操作阶段
+
+无论是同步还是异步，最终都需要执行以下数据库操作：
+
+1. **一人一单校验**：在事务中基于用户ID和优惠券ID查询已存在订单
+2. **原子库存扣减**：使用 MyBatis Plus 的乐观锁 CAS 操作保证库存扣减的原子性
+3. **订单创建**：保存订单记录
+
+> **注意**：同步版本直接在请求线程中执行数据库操作，而异步版本在后台线程池中执行。
+
+```
+用户请求 → Lua脚本校验（库存+重复下单）→ 成功
+								  ↓ →放入异步队列 → 后台线程处理（扣库存+保存订单）
+                                  ↓ →失败→直接返回
 ```
 
 ### 编码阶段
 
 **核心代码实现**：
 
+**创建优惠券**
+
+```java
+@PostMapping("/create")
+public Result createVoucher(@RequestBody VoucherDTO voucherDTO) {
+    Voucher voucher = BeanUtil.toBean(voucherDTO, Voucher.class);
+    voucherService.save(voucher);
+    // 创建秒杀活动并初始化Redis库存
+    List<VoucherSeckill> voucherSeckillList = voucherDTO.getVoucherSeckillList().stream()
+            .map(vs -> VoucherSeckill.builder()
+                    .stock(vs.getStock())
+                    .beginTime(vs.getBeginTime())
+                    .endTime(vs.getEndTime())
+                    .voucherId(voucher.getId())
+                    .build())
+            .toList();
+    // 将库存同步到Redis
+    for (VoucherSeckill vs : voucherSeckillList) {
+        stringRedisTemplate.opsForValue().set(
+            "voucherSeckill:stock:" + voucher.getId(), 
+            vs.getStock().toString());
+    }
+    voucherSeckillService.saveBatch(voucherSeckillList);
+    return Result.success("createVoucher");
+}
+```
+
 **Lua脚本（redis-seckill.lua）**：
+
 ```lua
 -- 参数：优惠券ID、用户ID
 local voucherId = ARGV[1]
@@ -917,7 +982,7 @@ private class HandleOrderTask implements Runnable {
 
 | 维度 | VoucherSeckillController | VoucherController | VoucherOrderController |
 | :--- | :--- | :--- | :--- |
-| **处理方式** | 同步 | 异步（内存队列） | 异步（Redis Stream） |
+| **处理方式** | 同步 | 异步（jvm队列） | 异步（Redis Stream） |
 | **队列类型** | 无 | ArrayBlockingQueue | Redis Stream |
 | **分布式锁** | Redisson | 自定义RedisLock | Redisson |
 | **消息持久化** | 无 | 无 | 有 |
@@ -948,8 +1013,8 @@ Q：为什么不用UUID？
 Q：为什么不用数据库自增ID？
 > A：数据库自增ID在分布式环境下需要额外处理（比如分库分表），而且生成ID需要访问数据库，性能不如Redis。
 
-Q：ID结构为什么是 时间戳(31位) + 序号(32位)？
-> A：31位时间戳可以表示约68年（2^31秒 ≈ 68年），从2020年开始够用。32位序号可以表示约42亿，足够单日并发使用。
+Q：ID结构为什么是 1位符号位+时间戳(31位) + 序号(32位)？
+> A：0作为符号位，正数自增，31位时间戳可以表示约68年（2^31秒 ≈ 68年），从2020年开始够用。32位序号可以表示约42亿，足够单日并发使用。
 
 **代码实现**：
 ```java
@@ -984,7 +1049,12 @@ Q：为什么锁的value要包含UUID+线程ID？
 Q：为什么用Lua脚本释放锁？
 > A：判断锁是否属于自己和删除锁需要原子性执行，否则在判断和删除之间锁可能过期被其他线程获取。
 
+Q：分布式锁持续时间？
+
+> A：许多主流的分布式锁框架（如 Java 生态中著名的 **Redisson**）在未指定超时时间时，其内置的 Watchdog（看门狗）默认续期时间就是 **30秒**。
+
 **代码实现**：
+
 ```java
 public class RedisLock implements ILock {
     private static final String KEY_PREFIX = "lock:";
@@ -1035,7 +1105,7 @@ return 0
 | 依赖 | 版本 | 功能支撑 |
 | :--- | :--- | :--- |
 | MyBatis Plus | 3.5.9 | ArticleMapper实现文章数据CRUD；AutoMetaObjectHandler自动填充创建人ID和时间 |
-| Spring Boot Starter Data Redis | 3.3.8 | **缓存策略**：ArticleServiceImpl使用分布式锁（`setIfAbsent`）+逻辑过期（RedisData包装类）防止缓存击穿；文章数据缓存10秒（逻辑过期）；更新/删除后主动删除缓存保证一致性 |
+| Spring Boot Starter Data Redis | 3.3.8 | **缓存策略**：ArticleServiceImpl使用分布式锁（`setIfAbsent`）5秒+逻辑过期（RedisData包装类），防止缓存击穿30秒；文章数据缓存**30分钟 - 2小时**（逻辑过期）本文选择**30分钟**负载平衡；更新/删除后主动删除缓存保证一致性 |
 | Spring Boot Starter Validation | 3.3.8 | 自定义@ArticleStatus注解校验文章状态只能为"已发布"或"草稿" |
 | Aliyun SDK OSS | 3.17.4 | 文章封面图片上传到阿里云OSS |
 | Hutool All | 5.8.36 | BeanUtil进行缓存数据对象转换；StrUtil判空；JSONUtil序列化/反序列化Redis数据 |
@@ -1044,7 +1114,7 @@ return 0
 | 依赖 | 版本 | 功能支撑 |
 | :--- | :--- | :--- |
 | MyBatis Plus | 3.5.9 | CategoryMapper实现分类数据CRUD；AutoMetaObjectHandler自动填充创建人ID和时间 |
-| Spring Boot Starter Data Redis | 3.3.8 | **缓存策略**：CategoryServiceImpl使用分布式锁+逻辑过期防止缓存击穿；分类数据缓存10秒（逻辑过期）；更新/删除后主动删除缓存 |
+| Spring Boot Starter Data Redis | 3.3.8 | **缓存策略**：CategoryServiceImpl使用分布式锁5秒+逻辑过期，防止缓存击穿30秒；分类数据缓存**10分钟 - 30分钟**（逻辑过期），本文选择**30分钟****负载平衡；更新/删除后主动删除缓存 |
 | Spring Boot Starter Validation | 3.3.8 | @NotNull、@Size等注解校验分类名称和别名参数 |
 | Hutool All | 5.8.36 | BeanUtil进行对象属性拷贝；StrUtil判空；JSONUtil序列化/反序列化 |
 
@@ -1052,7 +1122,7 @@ return 0
 | 依赖 | 版本 | 功能支撑 |
 | :--- | :--- | :--- |
 | MyBatis Plus | 3.5.9 | VoucherMapper、VoucherSeckillMapper、VoucherOrderMapper实现优惠券数据CRUD；AutoMetaObjectHandler自动填充create_time、update_time等元数据字段 |
-| Spring Boot Starter Data Redis | 3.3.8 | **分布式ID生成**：RedisID类基于Redis自增计数器实现全局唯一订单ID（时间戳31位+序号32位）；存储秒杀库存信息；**分布式锁**：RedisLock基于setIfAbsent实现锁获取，Lua脚本原子释放 |
+| Spring Boot Starter Data Redis | 3.3.8 | **分布式ID生成**：RedisID类基于Redis自增计数器实现全局唯一订单ID（0作为符号位+时间戳31位+序号32位）；存储秒杀库存信息；**分布式锁**：RedisLock基于setIfAbsent实现锁获取，Lua脚本原子释放 |
 | Spring Boot Starter Validation | 3.3.8 | 参数校验支持 |
 | Spring Boot Starter Web | 3.3.8 | 提供@Transactional注解实现秒杀订单事务一致性（通过spring-tx传递依赖） |
 | Hutool All | 5.8.36 | BeanUtil进行对象属性拷贝（VoucherDTO转Voucher）；UUID生成分布式锁唯一标识 |
@@ -1078,117 +1148,20 @@ return 0
 
 ---
 
-### 秒杀流程说明
+### 秒杀功能依赖
 
-本项目提供三个秒杀接口，分别对应不同的架构实现：
-
-| 接口 | 控制器 | 处理方式 |
+| 依赖 | 版本 | 功能支撑 |
 | :--- | :--- | :--- |
-| `POST /voucherSeckill/pay` | VoucherSeckillController | 同步处理 |
-| `POST /voucher/pay` | VoucherController | 异步（内存队列） |
-| `POST /voucherOrder/pay` | VoucherOrderController | 异步（Redis Stream） |
-
-#### 统一前置步骤
-
-**1. 创建优惠券**：通过 `POST /voucher/create` 接口创建优惠券及关联的秒杀活动配置
-
-```java
-@PostMapping("/create")
-public Result createVoucher(@RequestBody VoucherDTO voucherDTO) {
-    Voucher voucher = BeanUtil.toBean(voucherDTO, Voucher.class);
-    voucherService.save(voucher);
-    // 创建秒杀活动并初始化Redis库存
-    List<VoucherSeckill> voucherSeckillList = voucherDTO.getVoucherSeckillList().stream()
-            .map(vs -> VoucherSeckill.builder()
-                    .stock(vs.getStock())
-                    .beginTime(vs.getBeginTime())
-                    .endTime(vs.getEndTime())
-                    .voucherId(voucher.getId())
-                    .build())
-            .toList();
-    // 将库存同步到Redis
-    for (VoucherSeckill vs : voucherSeckillList) {
-        stringRedisTemplate.opsForValue().set(
-            "voucherSeckill:stock:" + voucher.getId(), 
-            vs.getStock().toString());
-    }
-    voucherSeckillService.saveBatch(voucherSeckillList);
-    return Result.success("createVoucher");
-}
-```
-
-**2. Lua脚本预校验**（异步版本）：所有异步版本都使用相同的Lua脚本完成前置校验
-
-```lua
--- redis-seckill.lua
-local voucherId = ARGV[1]
-local userId = ARGV[2]
-local orderId = ARGV[3]
-
-local stockKey = "voucherSeckill:stock:" .. voucherId
-local orderKey = "voucherSeckill:order:" .. voucherId
-local streamKey = "stream.order"
-
--- 1. 判断库存
-if tonumber(redis.call('get', stockKey)) <= 0 then
-    return 1  -- 库存不足
-end
-
--- 2. 判断是否已下单
-if redis.call('sismember', orderKey, userId) > 0 then
-    return 2  -- 重复下单
-end
-
--- 3. 扣减库存
-redis.call('incrby', stockKey, -1)
-
--- 4. 记录下单用户
-redis.call('sadd', orderKey, userId)
-
--- 5. 发送消息到Stream（VoucherOrderController使用）
-redis.call('xadd', streamKey, '*', 'voucherId', voucherId, 'userId', userId, 'orderId', orderId)
-
--- 6. 成功
-return 0
-```
-
-#### 同步版本流程（VoucherSeckillController）
-
-```
-用户请求 → 校验秒杀活动 → 生成订单ID → 直接调用secondKill() → 扣库存+保存订单 → 返回结果
-```
-
-#### 异步版本流程（VoucherController - 内存队列）
-
-```
-用户请求 → 校验秒杀活动 → Lua脚本校验 → 放入ArrayBlockingQueue → 返回订单ID
-                                                              ↓
-                                                    后台线程 take() → RedisLock → paySuccess() → 扣库存+保存订单
-```
-
-#### 异步版本流程（VoucherOrderController - Redis Stream）
-
-```
-用户请求 → 校验秒杀活动 → Lua脚本校验（自动XADD到Stream）→ 返回订单ID
-                                                                    ↓
-                                                         XREADGROUP读取 → 解析订单 → secondKill() → 扣库存+保存订单 → ACK确认
-```
-
-#### 数据库操作阶段（所有版本共用）
-
-无论是同步还是异步，最终都需要执行以下数据库操作：
-
-1. **一人一单校验**：在事务中基于用户ID和优惠券ID查询已存在订单
-2. **原子库存扣减**：使用 MyBatis Plus 的乐观锁 CAS 操作保证库存扣减的原子性
-3. **订单创建**：保存订单记录
-
-> **注意**：同步版本直接在请求线程中执行数据库操作，而异步版本在后台线程池中执行。
+|      |      |          |
+|      |      |          |
+|      |      |          |
 
 ---
 
-### 对比分析
+#### 对比分析
 
 **问题1：直接在Controller层用synchronized**
+
 ```java
 // 其他人写法 - 错误！
 @RequestMapping("/seckill")

@@ -35,7 +35,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         return category;
     }
     private Boolean cacheLocked(){
-        return stringRedisTemplate.opsForValue().setIfAbsent(LOCK_KEY, "locked", 6, TimeUnit.SECONDS);
+        return stringRedisTemplate.opsForValue().setIfAbsent(LOCK_KEY, "locked", 5, TimeUnit.SECONDS);
     }
     private void cacheUnlock(){
         stringRedisTemplate.delete(LOCK_KEY);
@@ -52,10 +52,10 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
                 try {
                     Category category = super.getById(id);
                     if (category == null) {
-                        stringRedisTemplate.opsForValue().set(key, "",10, TimeUnit.SECONDS);
+                        stringRedisTemplate.opsForValue().set(key, "",30, TimeUnit.SECONDS);
                         throw  new RuntimeException("id不存在");
                     }
-                    stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(category), 10, TimeUnit.MINUTES);
+                    stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(category), 30, TimeUnit.MINUTES);
                     return category;
                 } catch (Exception e) {
                     throw new RuntimeException(e);
@@ -82,13 +82,14 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             RedisData redisData = new RedisData();
             //没有id
             if (category == null) {
-                redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+                redisData.setExpireTime(LocalDateTime.now().plusSeconds(30));
                 redisData.setData(null);
                 stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
                 throw  new RuntimeException("id不存在");
             }
+            //有id
             redisData.setData(category);
-            redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+            redisData.setExpireTime(LocalDateTime.now().plusSeconds(5));
             stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
             return category;
         }
@@ -97,12 +98,12 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
         LocalDateTime expireTime = redisData.getExpireTime();
         //过期
         if (expireTime.isBefore(LocalDateTime.now())) {
-            log.info("缓存过期");
+            log.info("Category缓存过期");
             Boolean success = cacheLocked();
             if (success) {
                 try {
                     Category category = super.getById(id);
-                    redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+                    redisData.setExpireTime(LocalDateTime.now().plusSeconds(5));
                     redisData.setData(category);
                     stringRedisTemplate.opsForValue().set(key, JSONUtil.toJsonStr(redisData));
                 } catch (Exception e) {
@@ -117,7 +118,7 @@ public class CategoryServiceImpl extends ServiceImpl<CategoryMapper, Category> i
             }
         }
         //正常
-        log.info("缓存正常");
+        log.info("Category缓存正常");
         Category category = BeanUtil.toBean(redisData.getData(), Category.class);
         return category;
     }

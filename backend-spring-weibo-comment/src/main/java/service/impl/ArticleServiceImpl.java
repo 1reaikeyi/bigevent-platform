@@ -37,7 +37,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
     private Boolean cacheLock(){
         //对应 set key xxx nx, key为空写入xxx,否则返回false
-        return stringRedisTemplate.opsForValue().setIfAbsent(LOCK_KEY, "locked", 10, TimeUnit.SECONDS);
+        return stringRedisTemplate.opsForValue().setIfAbsent(LOCK_KEY, "locked", 5, TimeUnit.SECONDS);
     }
     private void cacheUnlock(){
         stringRedisTemplate.delete(LOCK_KEY);
@@ -60,10 +60,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
                 //4 数据库中没有数据，返回空值
                 if (article == null) {
                     //----缓存空值，过期时间60秒,解决缓存穿透问题
-                    stringRedisTemplate.opsForValue().set(KEYS + id, "", 10, TimeUnit.SECONDS);
+                    stringRedisTemplate.opsForValue().set(KEYS + id, "", 5, TimeUnit.SECONDS);
                     throw new RuntimeException("id不存在");
                 }
-                //5 缓存数据，过期时间60分钟
+                //5 缓存数据，过期时间30分钟
                 stringRedisTemplate.opsForValue().set(KEYS + id, JSONUtil.toJsonStr(article), 30, TimeUnit.MINUTES);
                 //6 返回数据
                 return article;
@@ -91,13 +91,13 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             RedisData redisData = new RedisData();
             if (article == null) {
                 redisData.setData(null);
-                redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+                redisData.setExpireTime(LocalDateTime.now().plusSeconds(30));
                 stringRedisTemplate.opsForValue().set(KEYS + id, JSONUtil.toJsonStr(redisData));
                 throw new RuntimeException("id不存在");
             }
-            // 正常数据，逻辑过期60s，redis实际不设置过期
+            // 正常数据，redis实际不设置过期
             redisData.setData(article);
-            redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+            redisData.setExpireTime(LocalDateTime.now().plusSeconds(5));
             stringRedisTemplate.opsForValue().set(KEYS + id, JSONUtil.toJsonStr(redisData));
             return article;
         }
@@ -106,12 +106,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
         //3 检查缓存是否过期
         //过期，从数据库中查询数据
         if (redisData.getExpireTime().isBefore(LocalDateTime.now())) {
-            log.info("缓存出现过期");
+            log.info("Article缓存出现过期");
             Boolean success = cacheLock();
             if(success) {
                 try {
                     Article article = super.getById(id);
-                    redisData.setExpireTime(LocalDateTime.now().plusSeconds(10));
+                    redisData.setExpireTime(LocalDateTime.now().plusSeconds(5));
                     redisData.setData(article);
                     stringRedisTemplate.opsForValue().set(KEYS + id, JSONUtil.toJsonStr(redisData));
                 } catch (Exception e) {
@@ -126,7 +126,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
             }
         }
         //正常，返回缓存中的数据
-        log.info("缓存正常");
+        log.info("Article缓存正常");
         Article article = BeanUtil.toBean(redisData.getData(), Article.class);
         return article;
     }

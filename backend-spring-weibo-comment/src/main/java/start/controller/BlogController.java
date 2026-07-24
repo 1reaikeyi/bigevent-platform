@@ -43,6 +43,10 @@ public class BlogController {
     public Result readBlogById(@PathVariable Long id) {
         return Result.success(blogService.getById(id));
     }
+    @GetMapping("/all")
+    public Result readBlog() {
+        return Result.success(blogService.list());
+    }
     @PostMapping("/liked/{id}")
     public Result isliked(@PathVariable Long id) {
         Long userId = ThreadLocalParam.getUserId();
