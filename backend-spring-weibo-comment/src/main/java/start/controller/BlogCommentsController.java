@@ -7,12 +7,10 @@ import common.constant.JwtConstant;
 import common.result.Result;
 import common.ThreadLocalContext.ThreadLocalContextHolder;
 import model.entity.Blog;
+import model.entity.BlogComments;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import service.BlogCommentsService;
 import service.BlogService;
 
@@ -25,5 +23,15 @@ public class BlogCommentsController {
     private BlogCommentsService blogCommentsService;
     @Autowired
     private BlogService blogService;
+    @PostMapping("/0/{id}")
+    public Result createBlog(@PathVariable("id") Long id, @RequestBody BlogComments blogComments) {
+        blogCommentsService.save(blogComments);
+        return Result.success();
+    }
+    @PostMapping("/1/{id}")
+    public Result createBlogComment(@PathVariable("id") Long id, @RequestBody BlogComments blogComments) {
+        blogCommentsService.save(blogComments);
+        return Result.success();
+    }
 
 }
